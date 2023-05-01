@@ -12,7 +12,7 @@ from getpass import getpass
 
 console = Console()
 
-def connect_to_vault():
+def connect_to_db():
     try:
         db = mysql.connector.connect(
         host ="localhost",
@@ -25,11 +25,11 @@ def connect_to_vault():
 
     return db
 
-def does_vault_exists():
-    db = connect_to_vault()
+def does_vault_exists(vault_name):
+    db = connect_to_db()
     cursor = db.cursor()
     
-    query = "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA  WHERE SCHEMA_NAME = 'password_shack'"
+    query = f'SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA  WHERE SCHEMA_NAME = \'{vault_name}\''
     cursor.execute(query)
     results = cursor.fetchall()
     
@@ -44,39 +44,39 @@ def does_vault_exists():
 def generateDeviceSecret(length=10):
 	return ''.join(random.choices(string.ascii_uppercase + string.digits, k = length))
 
-def create():
+def create_vault(vault_name):
     print("\n")
-    if does_vault_exists():
-        console.log("Vault [yellow]password_shack[/yellow] already exists")
+    if does_vault_exists(vault_name):
+        console.log(f'Vault [yellow]{vault_name}[/yellow] already exists')
         return
     
-    console.log("Creating new vault: [yellow]password_shack[/yellow]")
+    console.log(f'Creating new vault: [yellow]{vault_name}[/yellow]')
     
     # Creating the vault
-    db = connect_to_vault()
+    db = connect_to_db()
     cursor = db.cursor()
     
     try:
-        cursor.execute("CREATE DATABASE password_shack")
+        cursor.execute(f'CREATE DATABASE {vault_name}')
     except Exception as e:
-        console.log("[red]You have already created a vault named [yellow]password_shack[/yellow]")
+        console.log(f'[red]You have already created a vault named [yellow]{vault_name}[/yellow]')
         quit()
     
-    console.log("Vault [yellow]password_shack[/yellow] successfully created")
+    console.log(f'Vault [yellow]{vault_name}[/yellow] successfully created')
     
     # Create vault master key table
-    query = "CREATE TABLE password_shack.master_key (masterkey_hash TEXT NOT NULL, device_secret TEXT NOT NULL)"
+    query = f'CREATE TABLE {vault_name}.master_key (masterkey_hash TEXT NOT NULL, device_secret TEXT NOT NULL)'
     res = cursor.execute(query)
 
-    query = "CREATE TABLE password_shack.website_passwords (website_name TEXT NOT NULL, website_url TEXT, username TEXT NOT NULL, password TEXT NOT NULL)"
+    query = f'CREATE TABLE {vault_name}.website_passwords (website_name TEXT NOT NULL, website_url TEXT, username TEXT NOT NULL, password TEXT NOT NULL)'
     res = cursor.execute(query)
     
-    query = "CREATE TABLE password_shack.email_passwords (email_id TEXT NOT NULL, password TEXT NOT NULL)"
+    query = f'CREATE TABLE {vault_name}.email_passwords (email_id TEXT NOT NULL, password TEXT NOT NULL)'
     res = cursor.execute(query)
     
-    console.log("Vault shelves for [yellow]password_shack[/yellow] successfully created")
+    console.log(f'Vault shelves for [yellow]{vault_name}[/yellow] successfully created')
     
-    console.log("User needs to enter a master password for vault [yellow]password_shack[/yellow]")
+    console.log(f'User needs to enter a master password for vault [yellow]{vault_name}[/yellow]')
     
     # TODO:
     # 1. Make getting the master password a different function
@@ -101,15 +101,11 @@ def create():
     
     device_secret = generateDeviceSecret()
     
-    query = "INSERT INTO password_shack.master_key (masterkey_hash, device_secret) values (%s, %s)"
+    query = f'INSERT INTO {vault_name}.master_key (masterkey_hash, device_secret) values (%s, %s)'
     val = (hashed_mp, device_secret)
     cursor.execute(query, val)
     db.commit()
 
-    console.log("[yellow]password_shack[/yellow] vault creation completed")
+    console.log(f'[yellow]{vault_name}[/yellow] vault creation completed')
 
     db.close()
-
-    
-if __name__ == '__main__':
-    globals()[sys.argv[1]]()
