@@ -7,8 +7,10 @@ import mysql.connector
 
 from rich import print as printc
 from rich.console import Console
+from rich.pretty import pprint
 
 from getpass import getpass
+from utils import otp_generator
 
 console = Console()
 
@@ -39,6 +41,18 @@ def does_vault_exists(vault_name):
         return True
     
     return False
+
+def get_all_vaults_name():
+    db = connect_to_db()
+    cursor = db.cursor()
+    
+    query = f'SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA'
+    cursor.execute(query)
+    results = cursor.fetchall()
+    
+    db.close()
+    
+    return results
 
 # TODO: Make a better device secret generator
 def generateDeviceSecret(length=10):
@@ -109,3 +123,52 @@ def create_vault(vault_name):
     console.log(f'[yellow]{vault_name}[/yellow] vault creation completed')
 
     db.close()
+    
+def delete_vault(vault_name):
+    
+    if not does_vault_exists(vault_name):
+        console.log(f'[red]Error[/red]: Vault [yellow]{vault_name}[/yellow] does not exists')
+        return
+        
+    console.log("[red]Deleting a vault can have serious consequences. You will lose all of your stored passwords.[/red]")
+    
+    # TODO: Functionality to ask the user to enter the master password to his vault
+    # before deleting the vault
+    
+    otp_attempts = 0
+    is_correct = False
+    
+    while otp_attempts < 3:
+        otp = otp_generator()
+        first_half, sec_half = str(otp)[:3], str(otp)[3:]
+        console.log(f'Attempts remaining: [red]{3-otp_attempts}[/red]')
+        console.log(f'Enter the following 6-digit pin: [yellow bold]{first_half} {sec_half}[/yellow bold]')
+        
+        console.print("[cyan bold]OTP: [/cyan bold]", end="")
+        input_otp = int(input())
+        
+        if input_otp == otp:
+            is_correct = True
+            break
+        else:
+            otp_attempts += 1
+            
+    if not is_correct:
+        console.log("User did not enter the right OTP")
+        console.log("Exiting the program")
+        return
+    
+    db = connect_to_db()
+    cursor = db.cursor()
+    
+    query = f'DROP DATABASE {vault_name}'
+    cursor.execute(query)
+    db.commit()
+    db.close()
+    
+    console.log(f'Vault [yellow]{vault_name}[/yellow] deleted')
+    
+def list_vaults():
+    results = get_all_vaults_name()
+    pprint(results)
+    return    
